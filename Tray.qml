@@ -67,15 +67,22 @@ BarWidget {
   property var activeTrayAnchor: null
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property var hiddenIds: TrayModel.asList(settings.hidden).map(String)
+
+  // Read our own shell.json entry directly rather than trusting the host's
+  // one-time `settings` hand-off, which can lose a boot-time race and get
+  // stuck on empty defaults forever (see LocalSettings.qml).
+  LocalSettings { id: localSettings }
+  readonly property var persisted: localSettings.entry
+
+  readonly property var hiddenIds: TrayModel.asList(persisted.hidden).map(String)
   // Master switch for status-notifier icons: off removes them all from the
   // drawer (they stay listed in the manage popup for when it comes back on).
-  readonly property bool showTrayIcons: settings.showTrayIcons !== false
+  readonly property bool showTrayIcons: persisted.showTrayIcons !== false
   // One user-arranged order across BOTH kinds of drawer content: hosted
   // widget ids and status-notifier item ids share the token list, so icons
   // and plugin widgets interleave freely. Missing tokens keep arrival order
   // after the arranged ones.
-  readonly property var orderIds: TrayModel.asList(settings.order).map(String)
+  readonly property var orderIds: TrayModel.asList(persisted.order).map(String)
   readonly property var drawerItems: bucket("drawer")
   readonly property var allItems: bucket("all")
   readonly property int drawerCount: drawerItems.length
@@ -83,7 +90,7 @@ BarWidget {
 
   // Bar widgets captured into the drawer. Stored on this widget's own
   // shell.json entry so they survive restarts and sync across monitors.
-  readonly property var hostedWrappers: TrayModel.normalizeWrappers(settings.widgets)
+  readonly property var hostedWrappers: TrayModel.normalizeWrappers(persisted.widgets)
 
   // The drawer's single mixed model: hosted widgets and tray icons in one
   // ordered sequence.
@@ -855,7 +862,11 @@ BarWidget {
     if (!root.bar || !root.bar.shell || typeof root.bar.shell.updateEntryInline !== "function") return
     var id = root.moduleName || "io.github.tyrichards.tray"
     var payload = { id: id }
-    var current = root.settings || {}
+    // Base this on our own read (`persisted`), not the host-injected
+    // `settings` — if that hand-off lost the boot race and is stuck on the
+    // empty fallback, writing from it here would replace the real
+    // widgets/order/hidden on disk with nothing.
+    var current = root.persisted || {}
     for (var key in current) {
       if (key === "id" || key === "pinned" || key === "pinnedWidgets" || key === "iconOrder") continue
       payload[key] = current[key]

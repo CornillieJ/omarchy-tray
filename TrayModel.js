@@ -91,6 +91,17 @@ function wrapperId(wrapper) {
   return wrapper.entry ? entryId(wrapper.entry) : entryId(wrapper)
 }
 
+// Marks trayEntry's wrapper for `id` as tray-owned, so dragOutOfTray() knows
+// to remove the plugins[] entry it goes with. Used wherever a plugins[]
+// entry is added outside captureIntoTray's own call site.
+function markWrapperListed(trayEntry, id) {
+  var wrappers = trayEntry && Array.isArray(trayEntry.widgets) ? trayEntry.widgets : []
+  for (var i = 0; i < wrappers.length; i++) {
+    if (wrapperId(wrappers[i]) === id) { wrappers[i].listed = true; return true }
+  }
+  return false
+}
+
 // The shell loads a third-party plugin's widget component only while its id
 // is referenced in shell.json (bar.id, a bar.layout entry, or plugins[]).
 // A captured widget's id lives inside the tray's settings, which that scan
@@ -260,6 +271,7 @@ if (typeof module !== "undefined") {
     asList: asList,
     ensurePluginListed: ensurePluginListed,
     unlistPlugin: unlistPlugin,
+    markWrapperListed: markWrapperListed,
     itemNamed: itemNamed,
     entryId: entryId,
     entrySettings: entrySettings,
